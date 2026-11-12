@@ -1,86 +1,713 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>Data explorer</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Earthquake activity</title>
 <style>
-:root{color-scheme:light dark;--bg:#fff;--fg:#0b0b0f;--mut:#6c768a;--line:#d9dfea;--card:#f4f6fb;--acc:#111bf5}
-@media(prefers-color-scheme:dark){:root{--bg:#16171b;--fg:#f1f2f6;--mut:#9aa3b5;--line:#2c2f38;--card:#20222a;--acc:#7b84ff}}
+:root{
+  color-scheme:light dark;
+  --bg:#fffcf7;--fg:#17130f;--muted:#6f655b;--line:#eadfd2;--card:#faf5ee;
+  --accent:#d9480f;--accent-soft:#ffe8d9;
+  --ocean:#e8f1f3;--land:#cfdde1;--land-line:#b9ccd1;--grid:#0f172a14;
+  --shallow:#ea580c;--intermediate:#ca8a04;--deep:#0284c7;
+  --m-light:#64748b;--m-moderate:#b45309;--m-strong:#c2410c;--m-major:#b91c1c;
+  --m-light-fg:#fff;--m-moderate-fg:#fff;--m-strong-fg:#fff;--m-major-fg:#fff;--accent-fg:#fff;
+  --shadow:0 1px 2px rgba(23,19,15,.05),0 8px 24px rgba(23,19,15,.05);
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#14110e;--fg:#f6efe7;--muted:#a79a8d;--line:#2e2822;--card:#1c1814;
+  --accent:#fb923c;--accent-soft:#3a2517;
+  --ocean:#0e1a20;--land:#23343a;--land-line:#31484f;--grid:#ffffff14;
+  --shallow:#fb923c;--intermediate:#facc15;--deep:#38bdf8;
+  --m-light:#94a3b8;--m-moderate:#fbbf24;--m-strong:#fb923c;--m-major:#f87171;
+  --m-light-fg:#0b1220;--m-moderate-fg:#1c1306;--m-strong-fg:#1c0d03;--m-major-fg:#2a0606;--accent-fg:#1a0f05;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}}
 *{box-sizing:border-box}
-body{margin:0;padding:12px;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Roboto,sans-serif;font-size:14px}
-.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-input,select,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
-input{flex:1;min-width:120px}
-button{cursor:pointer}button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
-:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.chart{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
-.row{display:grid;grid-template-columns:110px 1fr 70px;gap:8px;align-items:center;cursor:pointer;padding:2px 4px;border-radius:8px;text-align:left;background:none;border:0;width:100%}
-.row:hover,.row[aria-pressed=true]{background:var(--card)}
-.row .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.track{height:12px;background:var(--card);border-radius:6px;overflow:hidden}
-.fill{height:100%;background:var(--acc);border-radius:6px}
-.num{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
-.detail{background:var(--card);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center}
-.detail img{width:56px;height:38px;object-fit:cover;border-radius:6px}
-.meta{color:var(--mut);font-size:12px;margin-top:8px}.empty{padding:24px;text-align:center;color:var(--mut)}
-</style></head>
+html,body{margin:0}
+body{padding:14px;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.4}
+h1{font-size:18px;letter-spacing:-.025em;margin:0}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+.sub{margin:3px 0 0;color:var(--muted);font-size:12px}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:650;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 9px;white-space:nowrap}
+.pulse{width:7px;height:7px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 3px #16a34a22}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:10px}
+.ctl{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ctl>label{font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:750}
+select,input{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:0 9px;height:34px;font-size:12.5px}
+select{cursor:pointer;padding-right:22px}
+.search{position:relative;flex:1 1 170px;min-width:150px}
+.search input{width:100%;padding-left:29px}
+.search svg{position:absolute;left:9px;top:8px;width:15px;height:15px;color:var(--muted);pointer-events:none}
+.chips{display:flex;gap:3px;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:3px;height:34px;align-items:center}
+.chip{border:0;background:transparent;border-radius:6px;padding:4px 7px;font-size:11px;font-weight:650;color:var(--muted);cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:9px;height:34px;padding:0 12px;font-size:12px;font-weight:650;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn:disabled{opacity:.6;cursor:progress}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 10px;min-width:0}
+.stat .k{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:750}
+.stat .v{display:block;font-size:16.5px;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .v small{font-size:10.5px;font-weight:600;color:var(--muted)}
+.notice{margin-bottom:9px;border:1px solid #dc262655;background:#dc262612;color:#b91c1c;border-radius:9px;padding:7px 10px;font-size:11.5px}
+@media(prefers-color-scheme:dark){.notice{color:#fca5a5}}
+.notice[hidden]{display:none}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:10px;align-items:start}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;box-shadow:var(--shadow);min-width:0}
+.panel[aria-busy="true"]{opacity:.62}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.panel-title{font-size:12px;font-weight:750;letter-spacing:.01em}
+.panel-sub{font-size:10.5px;color:var(--muted)}
+.map-wrap{border-radius:10px;overflow:hidden;background:var(--ocean)}
+svg.map{display:block;width:100%;height:auto;aspect-ratio:2/1}
+.map .ocean{fill:var(--ocean)}
+.map .gridline{stroke:var(--grid);stroke-width:.4}
+.map .gridline.eq{stroke-width:.8}
+.map .land{fill:var(--land);stroke:var(--land-line);stroke-width:.35}
+.map .dot{cursor:pointer;stroke:var(--bg);stroke-width:.5;transition:opacity .15s}
+.map .dot:hover{opacity:.68}
+.map .dot:focus{outline:none;stroke:var(--fg);stroke-width:1.1}
+.map .dot.shallow{fill:var(--shallow)}
+.map .dot.intermediate{fill:var(--intermediate)}
+.map .dot.deep{fill:var(--deep)}
+.map .dot.unknown{fill:var(--muted)}
+.map .halo{fill:none;stroke:var(--fg);stroke-width:.9;pointer-events:none}
+.map .halo2{fill:none;stroke:var(--fg);stroke-width:.45;opacity:.45;pointer-events:none;animation:pulse 2s ease-out infinite}
+@keyframes pulse{0%{opacity:.55}70%{opacity:.08}100%{opacity:0}}
+.legend{display:flex;gap:11px;align-items:center;flex-wrap:wrap;margin-top:7px;font-size:10.5px;color:var(--muted)}
+.legend .key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.legend i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.legend i.shallow{background:var(--shallow)}.legend i.intermediate{background:var(--intermediate)}.legend i.deep{background:var(--deep)}
+.detail{margin-top:8px;border-top:1px solid var(--line);padding-top:9px}
+.hint{font-size:12px;color:var(--muted);padding:11px 2px;text-align:center}
+.detail-top{display:flex;gap:10px;align-items:flex-start}
+.mag{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:34px;border-radius:9px;font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:var(--m-light-fg);background:var(--m-light);flex:none}
+.mag.m-moderate{background:var(--m-moderate);color:var(--m-moderate-fg)}
+.mag.m-strong{background:var(--m-strong);color:var(--m-strong-fg)}
+.mag.m-major{background:var(--m-major);color:var(--m-major-fg)}
+.detail-place{font-size:13px;font-weight:700;line-height:1.25}
+.detail-time{font-size:11px;color:var(--muted);margin-top:2px}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 12px;margin:9px 0 0}
+.fact{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;border-bottom:1px dashed var(--line);padding:3px 0;min-width:0}
+.fact .k{color:var(--muted);white-space:nowrap}
+.fact .v{font-weight:650;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link{display:inline-flex;align-items:center;gap:4px;margin-top:9px;font-size:11.5px;font-weight:700;color:var(--accent);text-decoration:none}
+.link:hover{text-decoration:underline}
+.list{max-height:374px;overflow:auto;display:flex;flex-direction:column;gap:1px;padding-right:2px;overscroll-behavior:contain}
+.list::-webkit-scrollbar{width:8px}
+.list::-webkit-scrollbar-thumb{background:var(--line);border-radius:999px}
+.row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:0;border-radius:8px;padding:5px 6px;cursor:pointer;color:inherit}
+.row:hover{background:var(--bg)}
+.row[aria-pressed="true"]{background:var(--accent-soft)}
+.row .mag{min-width:38px;height:27px;font-size:12.5px;border-radius:7px}
+.row-main{min-width:0;flex:1}
+.row-place{display:block;font-size:12px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-sub{display:flex;gap:5px;align-items:center;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.dkey{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none}
+.dkey.shallow{background:var(--shallow)}.dkey.intermediate{background:var(--intermediate)}.dkey.deep{background:var(--deep)}.dkey.unknown{background:var(--muted)}
+.chev{color:var(--muted);font-size:16px;line-height:1;flex:none}
+.empty{padding:30px 12px;text-align:center;color:var(--muted);font-size:12px}
+.empty .btn{margin-top:9px}
+.meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:10.5px;color:var(--muted)}
+.meta a{color:inherit}
+.reset{border:0;background:none;color:var(--accent);font:inherit;font-weight:700;cursor:pointer;padding:0}
+@media(max-width:720px){
+  .grid{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .list{max-height:300px}
+}
+@media(max-width:430px){
+  .controls{gap:6px}
+  .chips{width:100%;justify-content:space-between}
+  .chip{flex:1;padding:4px 2px}
+  .facts{grid-template-columns:1fr}
+}
+</style>
+</head>
 <body>
-<div class="bar">
-  <input id="q" placeholder="Search…" aria-label="Search">
-  <select id="cat" aria-label="Category"><option value="">All categories</option></select>
-  <select id="sort" aria-label="Sort"><option value="desc">Highest first</option><option value="asc">Lowest first</option></select>
-  <button id="go" class="primary">Fetch live data</button>
-</div>
-<div id="chart" class="chart" role="list"></div>
-<div id="detail"></div>
-<div id="meta" class="meta"></div>
+<header class="hdr">
+  <div>
+    <h1>Earthquake activity</h1>
+    <p class="sub" id="sub">Recent earthquakes from the live USGS feed</p>
+  </div>
+  <span class="live"><span class="pulse" aria-hidden="true"></span>USGS live</span>
+</header>
+
+<section class="controls" aria-label="Earthquake filters">
+  <div class="search ctl">
+    <label for="q">Place</label>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Search a place…" autocomplete="off">
+  </div>
+  <div class="ctl">
+    <label for="days">Window</label>
+    <select id="days">
+      <option value="1">Last 24 hours</option>
+      <option value="7">Last 7 days</option>
+      <option value="14">Last 14 days</option>
+      <option value="30">Last 30 days</option>
+    </select>
+  </div>
+  <div class="ctl">
+    <label for="minmag">Min magnitude</label>
+    <select id="minmag">
+      <option value="2.5">M2.5+</option>
+      <option value="3.5">M3.5+</option>
+      <option value="4.5">M4.5+</option>
+      <option value="5.5">M5.5+</option>
+      <option value="6.5">M6.5+</option>
+    </select>
+  </div>
+  <div class="ctl">
+    <label id="depth-label">Depth</label>
+    <div class="chips" role="group" aria-labelledby="depth-label">
+      <button class="chip" type="button" data-depth="all" aria-pressed="true">All</button>
+      <button class="chip" type="button" data-depth="shallow" aria-pressed="false">&lt;70</button>
+      <button class="chip" type="button" data-depth="intermediate" aria-pressed="false">70–300</button>
+      <button class="chip" type="button" data-depth="deep" aria-pressed="false">&gt;300</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label for="sort">Sort</label>
+    <select id="sort">
+      <option value="newest">Newest</option>
+      <option value="strongest">Strongest</option>
+      <option value="deepest">Deepest</option>
+    </select>
+  </div>
+  <button class="btn primary" id="refresh" type="button">Refresh</button>
+</section>
+
+<div class="notice" id="notice" role="alert" hidden></div>
+
+<section class="stats" aria-label="Summary">
+  <div class="stat"><span class="k">Events</span><span class="v" id="stat-events">–</span></div>
+  <div class="stat"><span class="k">Strongest</span><span class="v" id="stat-mag">–</span></div>
+  <div class="stat"><span class="k">Deepest</span><span class="v" id="stat-depth">–</span></div>
+  <div class="stat"><span class="k">Avg depth</span><span class="v" id="stat-avg">–</span></div>
+</section>
+
+<main class="grid">
+  <section class="panel map-panel" id="map-panel" aria-busy="false">
+    <div class="panel-head">
+      <span class="panel-title">Epicenters</span>
+      <span class="panel-sub" id="map-count">–</span>
+    </div>
+    <div class="map-wrap">
+      <svg class="map" id="map" viewBox="0 0 360 180" role="img" aria-label="World map of earthquake epicenters">
+        <rect class="ocean" x="0" y="0" width="360" height="180"/>
+        <g id="grid"></g>
+        <path class="land" d="__LAND_PATH__"></path>
+        <g id="dots"></g>
+      </svg>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <span class="key"><i class="shallow"></i>Shallow &lt;70 km</span>
+      <span class="key"><i class="intermediate"></i>Intermediate 70–300 km</span>
+      <span class="key"><i class="deep"></i>Deep &gt;300 km</span>
+      <span class="key">Size = magnitude</span>
+    </div>
+    <div id="detail"></div>
+  </section>
+
+  <section class="panel list-panel" id="list-panel" aria-busy="false">
+    <div class="panel-head">
+      <span class="panel-title">Events</span>
+      <span class="panel-sub" id="list-count">–</span>
+    </div>
+    <div class="list" id="list" role="list" aria-label="Earthquake events"></div>
+  </section>
+</main>
+
+<footer class="meta">
+  <span id="meta" aria-live="polite">Loading live earthquakes…</span>
+  <button class="reset" id="reset" type="button">Reset filters</button>
+</footer>
+
 <script type="module">
-const $=s=>document.querySelector(s);
-const oa=window.openai;
-let data=oa?.toolOutput??{items:[]};
-let ui={sel:null,sort:"desc",cat:"",...(oa?.widgetState??{})};
-const fmt=n=>Intl.NumberFormat(oa?.locale||undefined,{notation:"compact"}).format(n);
-const save=()=>oa?.setWidgetState?.(ui);
+const $ = (selector, root = document) => root.querySelector(selector);
+let oa = window.openai;
+const SVG_NS = "http://www.w3.org/2000/svg";
+const DEFAULTS = { days: 7, minMag: 2.5, depth: "all", sort: "newest", q: "", sel: null };
+const DEPTHS = new Set(["all", "shallow", "intermediate", "deep"]);
+const SORTS = new Set(["newest", "strongest", "deepest"]);
 
-function render(){
-  const items=[...(data.items||[])];
-  const cats=[...new Set(items.map(i=>i.category))].sort();
-  const cur=$("#cat").value||ui.cat;
-  $("#cat").innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option ${c===cur?"selected":""}>${c}</option>`).join("");
-  $("#sort").value=ui.sort;
-  let view=items.filter(i=>!ui.cat||i.category===ui.cat).sort((a,b)=>ui.sort==="asc"?a.value-b.value:b.value-a.value);
-  const max=Math.max(1,...view.map(i=>i.value));
-  $("#chart").innerHTML=view.length?"":`<div class="empty">${data.error?("Could not load: "+data.error):"No results. Try another search."}</div>`;
-  view.forEach(i=>{
-    const b=document.createElement("button");b.className="row";b.setAttribute("role","listitem");
-    b.setAttribute("aria-pressed",String(ui.sel===i.id));
-    b.innerHTML=`<span class="t"></span><span class="track"><span class="fill" style="width:${(i.value/max*100).toFixed(1)}%;display:block"></span></span><span class="num">${fmt(i.value)}</span>`;
-    b.querySelector(".t").textContent=i.title;
-    b.onclick=()=>{ui.sel=i.id;save();render();};
-    $("#chart").appendChild(b);
+const saved = oa?.widgetState ?? {};
+const state = {
+  days: Number(saved.days) || DEFAULTS.days,
+  minMag: Number(saved.minMag) || DEFAULTS.minMag,
+  depth: DEPTHS.has(saved.depth) ? saved.depth : DEFAULTS.depth,
+  sort: SORTS.has(saved.sort) ? saved.sort : DEFAULTS.sort,
+  q: typeof saved.q === "string" ? saved.q : DEFAULTS.q,
+  sel: typeof saved.sel === "string" ? saved.sel : DEFAULTS.sel,
+};
+
+let data = oa?.toolOutput ?? null;
+let busy = false;
+const demoMode = () => !oa?.callTool;
+const locale = oa?.locale || navigator.language || "en";
+const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
+const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+const relative = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+const MAG_CLASS = { light: "m-light", moderate: "m-moderate", strong: "m-strong", major: "m-major" };
+const DEPTH_TEXT = { shallow: "shallow", intermediate: "intermediate", deep: "deep", unknown: "unknown" };
+
+const fmtMag = (mag) => (Number.isFinite(mag) ? mag.toFixed(1) : "–");
+const fmtDepth = (depth) => (Number.isFinite(depth) ? `${number.format(depth)} km` : "–");
+const magClass = (item) => MAG_CLASS[item.magnitudeBand] || "m-light";
+const projX = (lon) => String(Math.max(0, Math.min(360, Number(lon) + 180)));
+const projY = (lat) => String(Math.max(0, Math.min(180, 90 - Number(lat))));
+const radius = (mag) => Math.max(1.3, Math.min(7.2, 1.1 + (Number(mag) - 2) * 0.9));
+
+function ago(ms) {
+  if (!Number.isFinite(ms)) return "";
+  const diff = ms - Date.now();
+  const abs = Math.abs(diff);
+  if (abs < 60_000) return "just now";
+  if (abs < 3_600_000) return relative.format(Math.round(diff / 60_000), "minute");
+  if (abs < 86_400_000) return relative.format(Math.round(diff / 3_600_000), "hour");
+  return relative.format(Math.round(diff / 86_400_000), "day");
+}
+
+function safeUrl(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function save() {
+  try { oa?.setWidgetState?.({ ...state }); } catch { /* host bridge is optional */ }
+}
+
+function setStat(selector, value, suffix = "") {
+  const el = $(selector);
+  el.textContent = value;
+  if (suffix) {
+    const small = document.createElement("small");
+    small.textContent = ` ${suffix}`;
+    el.appendChild(small);
+  }
+}
+
+function syncControls() {
+  ensureSelectOption($("#days"), state.days, `Last ${state.days} days`);
+  ensureSelectOption($("#minmag"), state.minMag, `M${state.minMag}+`);
+  $("#q").value = state.q;
+  $("#days").value = String(state.days);
+  $("#minmag").value = String(state.minMag);
+  $("#sort").value = state.sort;
+  document.querySelectorAll(".chip").forEach((chip) => {
+    chip.setAttribute("aria-pressed", String(chip.dataset.depth === state.depth));
   });
-  const s=items.find(i=>i.id===ui.sel);
-  $("#detail").innerHTML="";
-  if(s){const d=document.createElement("div");d.className="detail";
-    d.innerHTML=`${s.image?`<img alt="" src="${s.image}">`:""}<div><strong></strong><div class="meta"></div></div>`;
-    d.querySelector("strong").textContent=s.title;
-    d.querySelector(".meta").textContent=`${s.subtitle} · ${s.category} · ${s.value.toLocaleString()}`;
-    $("#detail").appendChild(d);}
-  $("#meta").textContent=data.fetchedAt?`Live data from ${data.source} · ${new Date(data.fetchedAt).toLocaleTimeString()}`:"";
-  oa?.notifyIntrinsicHeight?.(document.body.scrollHeight);
 }
 
-async function refresh(){
-  const args={query:$("#q").value.trim(),category:"",limit:20};
-  $("#go").textContent="Loading…";
-  try{
-    if(oa?.callTool){const r=await oa.callTool("explore_data",args);if(r?.structuredContent)data=r.structuredContent;}
-    else{data=await (await fetch("/api/demo")).json();}
-  }catch(e){data={items:[],error:e.message};}
-  $("#go").textContent="Fetch live data";ui.cat="";ui.sel=null;save();render();
+function ensureSelectOption(select, value, label) {
+  const text = String(value);
+  if ([...select.options].some((option) => option.value === text)) return;
+  const option = document.createElement("option");
+  option.value = text;
+  option.textContent = label;
+  select.appendChild(option);
 }
-$("#go").onclick=refresh;
-$("#q").addEventListener("keydown",e=>{if(e.key==="Enter")refresh();});
-$("#cat").onchange=e=>{ui.cat=e.target.value;save();render();};
-$("#sort").onchange=e=>{ui.sort=e.target.value;save();render();};
-$("#q").value=data.query||"";
-addEventListener("openai:set_globals",e=>{const g=e.detail?.globals;if(g?.toolOutput){data=g.toolOutput;render();}},{passive:true});
-render();
-</script></body></html>
+
+function setBusy(on) {
+  busy = on;
+  const button = $("#refresh");
+  button.disabled = on;
+  button.textContent = on ? "Updating…" : "Refresh";
+  $("#map-panel").setAttribute("aria-busy", String(on));
+  $("#list-panel").setAttribute("aria-busy", String(on));
+}
+
+function filteredItems() {
+  const needle = state.q.trim().toLowerCase();
+  const items = (Array.isArray(data?.items) ? data.items : []).filter((item) => {
+    if (needle && !String(item.place ?? "").toLowerCase().includes(needle)) return false;
+    if (state.depth !== "all" && item.depthBand !== state.depth) return false;
+    if (Number.isFinite(item.mag) && Number.isFinite(state.minMag) && item.mag < state.minMag) return false;
+    return true;
+  });
+
+  const byNewest = (a, b) => (b.timeMs ?? 0) - (a.timeMs ?? 0);
+  const sorters = {
+    newest: byNewest,
+    strongest: (a, b) => (b.mag ?? -1) - (a.mag ?? -1) || byNewest(a, b),
+    deepest: (a, b) => (b.depthKm ?? -1) - (a.depthKm ?? -1) || byNewest(a, b),
+  };
+  return items.sort(sorters[state.sort] || byNewest);
+}
+
+function select(id, scroll) {
+  state.sel = id;
+  save();
+  render();
+  if (scroll) {
+    requestAnimationFrame(() => {
+      const row = [...document.querySelectorAll(".row")].find((el) => el.dataset.id === id);
+      row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }
+}
+
+function renderGrid() {
+  const grid = $("#grid");
+  if (grid.childElementCount) return;
+  const line = (x1, y1, x2, y2, extra = "") => {
+    const el = document.createElementNS(SVG_NS, "line");
+    el.setAttribute("x1", x1); el.setAttribute("y1", y1);
+    el.setAttribute("x2", x2); el.setAttribute("y2", y2);
+    el.setAttribute("class", `gridline ${extra}`);
+    grid.appendChild(el);
+  };
+  for (let lon = -150; lon <= 150; lon += 30) line(projX(lon), 0, projX(lon), 180);
+  for (let lat = -60; lat <= 60; lat += 30) line(0, projY(lat), 360, projY(lat), lat === 0 ? "eq" : "");
+}
+
+function renderMap(items) {
+  renderGrid();
+  const dots = $("#dots");
+  dots.textContent = "";
+  const ordered = [...items].sort((a, b) => (a.mag ?? 0) - (b.mag ?? 0));
+
+  for (const item of ordered) {
+    const dot = document.createElementNS(SVG_NS, "circle");
+    dot.setAttribute("cx", projX(item.lon));
+    dot.setAttribute("cy", projY(item.lat));
+    dot.setAttribute("r", String(radius(item.mag)));
+    dot.setAttribute("class", `dot ${item.depthBand || "unknown"}`);
+    dot.setAttribute("tabindex", "0");
+    dot.setAttribute("role", "button");
+    dot.setAttribute("aria-label", `Magnitude ${fmtMag(item.mag)}, ${item.place}, ${fmtDepth(item.depthKm)} deep`);
+    const title = document.createElementNS(SVG_NS, "title");
+    title.textContent = `M ${fmtMag(item.mag)} · ${item.place} · ${fmtDepth(item.depthKm)} deep`;
+    dot.appendChild(title);
+    dot.addEventListener("click", () => select(item.id, true));
+    dot.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        select(item.id, true);
+      }
+    });
+    dots.appendChild(dot);
+  }
+
+  const selected = items.find((item) => item.id === state.sel);
+  if (selected) {
+    const halo = document.createElementNS(SVG_NS, "circle");
+    halo.setAttribute("cx", projX(selected.lon));
+    halo.setAttribute("cy", projY(selected.lat));
+    halo.setAttribute("r", String(radius(selected.mag) + 3.2));
+    halo.setAttribute("class", "halo");
+    const pulse = halo.cloneNode(false);
+    pulse.setAttribute("r", String(radius(selected.mag) + 6));
+    pulse.setAttribute("class", "halo2");
+    dots.append(halo, pulse);
+  }
+}
+
+function renderList(items) {
+  const list = $("#list");
+  list.textContent = "";
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    if (data?.error) {
+      empty.textContent = `Could not load live data. ${data.error}`;
+      const retry = document.createElement("button");
+      retry.className = "btn";
+      retry.type = "button";
+      retry.textContent = "Try again";
+      retry.addEventListener("click", refresh);
+      empty.appendChild(document.createElement("br"));
+      empty.appendChild(retry);
+    } else if (busy || !data) {
+      empty.textContent = "Loading live earthquakes…";
+    } else if (data?.items?.length) {
+      empty.textContent = "No earthquakes match these filters.";
+    } else {
+      empty.textContent = "No earthquakes in this time window.";
+    }
+    list.appendChild(empty);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const item of items) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "row";
+    row.dataset.id = item.id;
+    row.setAttribute("role", "listitem");
+    row.setAttribute("aria-pressed", String(item.id === state.sel));
+    row.setAttribute("aria-label", `Magnitude ${fmtMag(item.mag)}, ${item.place}, ${fmtDepth(item.depthKm)} deep, ${ago(item.timeMs)}`);
+    row.innerHTML =
+      `<span class="mag ${magClass(item)}">${fmtMag(item.mag)}</span>` +
+      `<span class="row-main"><span class="row-place"></span>` +
+      `<span class="row-sub"><span class="dkey ${item.depthBand || "unknown"}"></span>` +
+      `<span class="dtext"></span><span>·</span><span class="ago"></span></span></span>` +
+      `<span class="chev" aria-hidden="true">›</span>`;
+    row.querySelector(".row-place").textContent = item.place;
+    row.querySelector(".dtext").textContent = `${fmtDepth(item.depthKm)} deep`;
+    row.querySelector(".ago").textContent = ago(item.timeMs);
+    row.addEventListener("click", () => select(item.id, false));
+    fragment.appendChild(row);
+  }
+  list.appendChild(fragment);
+}
+
+function renderDetail(item) {
+  const box = $("#detail");
+  box.textContent = "";
+  if (!item) {
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = "Select an epicenter or event to see details.";
+    box.appendChild(hint);
+    return;
+  }
+
+  const detail = document.createElement("div");
+  detail.className = "detail";
+
+  const top = document.createElement("div");
+  top.className = "detail-top";
+  const mag = document.createElement("span");
+  mag.className = `mag ${magClass(item)}`;
+  mag.textContent = fmtMag(item.mag);
+  const heading = document.createElement("div");
+  const place = document.createElement("div");
+  place.className = "detail-place";
+  place.textContent = item.place;
+  const time = document.createElement("div");
+  time.className = "detail-time";
+  time.textContent = Number.isFinite(item.timeMs)
+    ? `${ago(item.timeMs)} · ${dateTime.format(new Date(item.timeMs))}`
+    : "Time unavailable";
+  heading.append(place, time);
+  top.append(mag, heading);
+
+  const facts = document.createElement("div");
+  facts.className = "facts";
+  const fact = (key, value) => {
+    const row = document.createElement("div");
+    row.className = "fact";
+    const k = document.createElement("span");
+    k.className = "k";
+    k.textContent = key;
+    const v = document.createElement("span");
+    v.className = "v";
+    v.textContent = value;
+    v.title = value;
+    row.append(k, v);
+    facts.appendChild(row);
+  };
+  fact("Depth", `${fmtDepth(item.depthKm)} · ${DEPTH_TEXT[item.depthBand] || "unknown"}`);
+  fact("Coordinates", `${Number(item.lat).toFixed(2)}°, ${Number(item.lon).toFixed(2)}°`);
+  fact("Felt reports", item.felt ? number.format(item.felt) : "None");
+  fact("Tsunami flag", item.tsunami ? "Yes" : "No");
+  fact("Magnitude type", (item.magType || "–").toUpperCase());
+  fact("Review status", item.status ? item.status[0].toUpperCase() + item.status.slice(1) : "–");
+
+  detail.append(top, facts);
+
+  const url = safeUrl(item.url);
+  if (url) {
+    const link = document.createElement("a");
+    link.className = "link";
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Open USGS event page ↗";
+    detail.appendChild(link);
+  }
+  box.appendChild(detail);
+}
+
+function renderMeta(items) {
+  const meta = $("#meta");
+  if (data?.error) {
+    meta.textContent = `⚠ ${data.error}`;
+    return;
+  }
+  const updated = data?.fetchedAt ? dateTime.format(new Date(data.fetchedAt)) : null;
+  const first = data?.timeRange?.firstEvent ? new Date(data.timeRange.firstEvent) : null;
+  const last = data?.timeRange?.lastEvent ? new Date(data.timeRange.lastEvent) : null;
+  const windowText = first && last
+    ? `${dateTime.format(first)} – ${dateTime.format(last)}`
+    : null;
+  const parts = [];
+  parts.push(demoMode() ? "Local preview · live USGS data" : data?.source || "USGS Earthquake Hazards Program");
+  if (updated) parts.push(`updated ${updated}`);
+  if (windowText) parts.push(`events ${windowText}`);
+  if (data?.returned && data?.matched && data.matched > data.returned) {
+    parts.push(`latest ${data.returned} of ${data.matched} matches`);
+  }
+  meta.textContent = parts.join(" · ");
+  $("#sub").textContent = items.length
+    ? `${items.length} event${items.length === 1 ? "" : "s"} in view · live USGS feed`
+    : "Recent earthquakes from the live USGS feed";
+}
+
+function render() {
+  const all = Array.isArray(data?.items) ? data.items : [];
+  const items = filteredItems();
+
+  if (items.length && !items.some((item) => item.id === state.sel)) {
+    state.sel = items[0].id;
+    save();
+  }
+  if (!items.length) state.sel = null;
+
+  const selected = items.find((item) => item.id === state.sel) || null;
+  const magnitudes = items.map((item) => item.mag).filter(Number.isFinite);
+  const depths = items.map((item) => item.depthKm).filter(Number.isFinite);
+  const avgDepth = depths.length ? depths.reduce((sum, value) => sum + value, 0) / depths.length : null;
+
+  setStat("#stat-events", number.format(items.length), all.length !== items.length ? `of ${number.format(all.length)}` : "");
+  setStat("#stat-mag", magnitudes.length ? `M ${fmtMag(Math.max(...magnitudes))}` : "–");
+  setStat("#stat-depth", depths.length ? fmtDepth(Math.max(...depths)) : "–");
+  setStat("#stat-avg", fmtDepth(avgDepth));
+
+  $("#map-count").textContent = items.length ? `${number.format(items.length)} plotted` : "No events";
+  $("#list-count").textContent = items.length ? `${number.format(items.length)} shown` : "No events";
+  $("#notice").hidden = !data?.error;
+  if (data?.error) $("#notice").textContent = data.error;
+
+  renderMap(items);
+  renderList(items);
+  renderDetail(selected);
+  renderMeta(items);
+  requestAnimationFrame(() => oa?.notifyIntrinsicHeight?.(document.body.scrollHeight));
+}
+
+function adoptQuery(result) {
+  const query = result?.query;
+  if (!query) return;
+  if (Number.isFinite(Number(query.days))) state.days = Number(query.days);
+  if (Number.isFinite(Number(query.minMagnitude))) state.minMag = Number(query.minMagnitude);
+  if (typeof query.place === "string") state.q = query.place;
+  syncControls();
+}
+
+async function refresh() {
+  if (busy) return;
+  setBusy(true);
+  const args = { place: "", minMagnitude: state.minMag, days: state.days, limit: 500 };
+  try {
+    let result;
+    if (oa?.callTool) {
+      const response = await oa.callTool("explore_earthquakes", args);
+      result = response?.structuredContent;
+      if (!result && typeof response?.content?.[0]?.text === "string") {
+        try { result = JSON.parse(response.content[0].text); } catch { /* not JSON */ }
+      }
+      if (!result) throw new Error("The tool did not return widget data.");
+    } else {
+      const params = new URLSearchParams({ days: String(state.days), minMagnitude: String(state.minMag), limit: "500" });
+      const response = await fetch(`/api/demo?${params}`, { headers: { accept: "application/json" } });
+      if (!response.ok) throw new Error(`Preview request failed (${response.status}).`);
+      result = await response.json();
+    }
+    data = result;
+    state.sel = null;
+    save();
+  } catch (error) {
+    data = {
+      ...(Array.isArray(data?.items) && data.items.length ? data : { items: [] }),
+      error: error.message,
+      fetchedAt: new Date().toISOString(),
+    };
+  } finally {
+    setBusy(false);
+    render();
+  }
+}
+
+let searchTimer;
+$("#q").addEventListener("input", (event) => {
+  state.q = event.target.value;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    save();
+    render();
+  }, 120);
+});
+
+$("#days").addEventListener("change", (event) => {
+  state.days = Number(event.target.value);
+  save();
+  refresh();
+});
+
+$("#minmag").addEventListener("change", (event) => {
+  state.minMag = Number(event.target.value);
+  save();
+  refresh();
+});
+
+$("#sort").addEventListener("change", (event) => {
+  state.sort = event.target.value;
+  save();
+  render();
+});
+
+document.querySelectorAll(".chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    state.depth = chip.dataset.depth;
+    save();
+    render();
+  });
+});
+
+$("#refresh").addEventListener("click", refresh);
+$("#reset").addEventListener("click", () => {
+  Object.assign(state, DEFAULTS);
+  syncControls();
+  save();
+  refresh();
+});
+
+window.addEventListener("openai:set_globals", (event) => {
+  oa = window.openai ?? oa;
+  const globals = event.detail?.globals;
+  if (!globals) return;
+  if (globals.toolOutput) {
+    data = globals.toolOutput;
+    adoptQuery(data);
+    render();
+  } else if (globals.widgetState && !data) {
+    Object.assign(state, globals.widgetState);
+    syncControls();
+    render();
+  }
+});
+
+window.addEventListener("resize", () => {
+  oa?.notifyIntrinsicHeight?.(document.body.scrollHeight);
+});
+
+syncControls();
+if (data) {
+  adoptQuery(data);
+  render();
+} else {
+  render();
+  // Local preview fallback. In Athena the host bridge supplies toolOutput instead.
+  setTimeout(() => {
+    if (!data && !window.openai?.callTool) {
+      oa = window.openai ?? oa;
+      refresh();
+    }
+  }, 450);
+}
+</script>
+</body>
+</html>
