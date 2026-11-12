@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Data explorer</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#0b0b0f;--mut:#6c768a;--line:#d9dfea;--card:#f4f6fb;--acc:#111bf5}
+@media(prefers-color-scheme:dark){:root{--bg:#16171b;--fg:#f1f2f6;--mut:#9aa3b5;--line:#2c2f38;--card:#20222a;--acc:#7b84ff}}
+*{box-sizing:border-box}
+body{margin:0;padding:12px;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Roboto,sans-serif;font-size:14px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+input,select,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+input{flex:1;min-width:120px}
+button{cursor:pointer}button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.chart{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.row{display:grid;grid-template-columns:110px 1fr 70px;gap:8px;align-items:center;cursor:pointer;padding:2px 4px;border-radius:8px;text-align:left;background:none;border:0;width:100%}
+.row:hover,.row[aria-pressed=true]{background:var(--card)}
+.row .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track{height:12px;background:var(--card);border-radius:6px;overflow:hidden}
+.fill{height:100%;background:var(--acc);border-radius:6px}
+.num{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+.detail{background:var(--card);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center}
+.detail img{width:56px;height:38px;object-fit:cover;border-radius:6px}
+.meta{color:var(--mut);font-size:12px;margin-top:8px}.empty{padding:24px;text-align:center;color:var(--mut)}
+</style></head>
+<body>
+<div class="bar">
+  <input id="q" placeholder="Search…" aria-label="Search">
+  <select id="cat" aria-label="Category"><option value="">All categories</option></select>
+  <select id="sort" aria-label="Sort"><option value="desc">Highest first</option><option value="asc">Lowest first</option></select>
+  <button id="go" class="primary">Fetch live data</button>
+</div>
+<div id="chart" class="chart" role="list"></div>
+<div id="detail"></div>
+<div id="meta" class="meta"></div>
+<script type="module">
+const $=s=>document.querySelector(s);
+const oa=window.openai;
+let data=oa?.toolOutput??{items:[]};
+let ui={sel:null,sort:"desc",cat:"",...(oa?.widgetState??{})};
+const fmt=n=>Intl.NumberFormat(oa?.locale||undefined,{notation:"compact"}).format(n);
+const save=()=>oa?.setWidgetState?.(ui);
+
+function render(){
+  const items=[...(data.items||[])];
+  const cats=[...new Set(items.map(i=>i.category))].sort();
+  const cur=$("#cat").value||ui.cat;
+  $("#cat").innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option ${c===cur?"selected":""}>${c}</option>`).join("");
+  $("#sort").value=ui.sort;
+  let view=items.filter(i=>!ui.cat||i.category===ui.cat).sort((a,b)=>ui.sort==="asc"?a.value-b.value:b.value-a.value);
+  const max=Math.max(1,...view.map(i=>i.value));
+  $("#chart").innerHTML=view.length?"":`<div class="empty">${data.error?("Could not load: "+data.error):"No results. Try another search."}</div>`;
+  view.forEach(i=>{
+    const b=document.createElement("button");b.className="row";b.setAttribute("role","listitem");
+    b.setAttribute("aria-pressed",String(ui.sel===i.id));
+    b.innerHTML=`<span class="t"></span><span class="track"><span class="fill" style="width:${(i.value/max*100).toFixed(1)}%;display:block"></span></span><span class="num">${fmt(i.value)}</span>`;
+    b.querySelector(".t").textContent=i.title;
+    b.onclick=()=>{ui.sel=i.id;save();render();};
+    $("#chart").appendChild(b);
+  });
+  const s=items.find(i=>i.id===ui.sel);
+  $("#detail").innerHTML="";
+  if(s){const d=document.createElement("div");d.className="detail";
+    d.innerHTML=`${s.image?`<img alt="" src="${s.image}">`:""}<div><strong></strong><div class="meta"></div></div>`;
+    d.querySelector("strong").textContent=s.title;
+    d.querySelector(".meta").textContent=`${s.subtitle} · ${s.category} · ${s.value.toLocaleString()}`;
+    $("#detail").appendChild(d);}
+  $("#meta").textContent=data.fetchedAt?`Live data from ${data.source} · ${new Date(data.fetchedAt).toLocaleTimeString()}`:"";
+  oa?.notifyIntrinsicHeight?.(document.body.scrollHeight);
+}
+
+async function refresh(){
+  const args={query:$("#q").value.trim(),category:"",limit:20};
+  $("#go").textContent="Loading…";
+  try{
+    if(oa?.callTool){const r=await oa.callTool("explore_data",args);if(r?.structuredContent)data=r.structuredContent;}
+    else{data=await (await fetch("/api/demo")).json();}
+  }catch(e){data={items:[],error:e.message};}
+  $("#go").textContent="Fetch live data";ui.cat="";ui.sel=null;save();render();
+}
+$("#go").onclick=refresh;
+$("#q").addEventListener("keydown",e=>{if(e.key==="Enter")refresh();});
+$("#cat").onchange=e=>{ui.cat=e.target.value;save();render();};
+$("#sort").onchange=e=>{ui.sort=e.target.value;save();render();};
+$("#q").value=data.query||"";
+addEventListener("openai:set_globals",e=>{const g=e.detail?.globals;if(g?.toolOutput){data=g.toolOutput;render();}},{passive:true});
+render();
+</script></body></html>
